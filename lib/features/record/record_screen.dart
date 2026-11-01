@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/text_size_button.dart';
 import '../../core/theme/theme_toggle_switch.dart';
 import '../../core/vitals/vital_type.dart';
+import '../manual_entry/manual_entry_header_button.dart';
+import '../manual_entry/manual_entry_sheet.dart';
 import 'record_controller.dart';
 import 'widgets/dynamic_island_pill.dart';
 import 'widgets/mic_button.dart';
+import 'widgets/reserved_keywords_modal.dart';
 import 'widgets/review_card.dart';
 
 class RecordScreen extends ConsumerStatefulWidget {
@@ -45,9 +48,10 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
         elevation: 0,
         backgroundColor: theme.appBarTheme.backgroundColor?.withValues(alpha: 0.9),
         surfaceTintColor: Colors.transparent,
-        actions: const [
-          TextSizeButton(),
-          ThemeToggleSwitch(),
+        actions: [
+          const ManualEntryHeaderButton(),
+          const TextSizeButton(),
+          const ThemeToggleSwitch(),
         ],
       ),
       body: SafeArea(
@@ -177,7 +181,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Hold the mic and say any trigger keyword followed by values (e.g., "Glucose 120" or "BP 120 over 80"):',
+            'Tap any vital badge below to view all accepted voice triggers and examples:',
             style: theme.textTheme.bodySmall?.copyWith(
               color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               height: 1.4,
@@ -188,30 +192,46 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
             spacing: 8,
             runSpacing: 8,
             children: VitalType.values.map((v) {
-              return Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: v.color.withValues(alpha: isDark ? 0.14 : 0.07),
+              return Material(
+                color: v.color.withValues(alpha: isDark ? 0.16 : 0.08),
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  onTap: () => ReservedKeywordsModal.show(context, v),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: v.color.withValues(alpha: isDark ? 0.35 : 0.22),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(v.icon, size: 14, color: v.color),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${v.displayName} (${v.defaultUnit})',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: v.color.withValues(alpha: isDark ? 0.40 : 0.25),
+                        width: 1.1,
                       ),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(v.icon, size: 14, color: v.color),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${v.displayName} (${v.defaultUnit})',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? const Color(0xFFF1F5F9)
+                                : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 13,
+                          color: v.color,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             }).toList(),
@@ -228,7 +248,7 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
     bool isDark,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -243,14 +263,43 @@ class _RecordScreenState extends ConsumerState<RecordScreen> {
           ),
         ],
       ),
-      child: Center(
-        child: MicButton(
-          isListening: state.status == RecordStatus.listening,
-          isProcessing: state.status == RecordStatus.processing,
-          soundLevel: state.soundLevel,
-          onPressDown: () => controller.onMicPressDown(),
-          onPressUp: () => controller.onMicPressUp(),
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MicButton(
+            isListening: state.status == RecordStatus.listening,
+            isProcessing: state.status == RecordStatus.processing,
+            soundLevel: state.soundLevel,
+            onPressDown: () => controller.onMicPressDown(),
+            onPressUp: () => controller.onMicPressUp(),
+          ),
+          const SizedBox(height: 18),
+          TextButton.icon(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              ManualEntrySheet.show(context);
+            },
+            icon: Icon(
+              Icons.edit_calendar_rounded,
+              size: 16,
+              color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+            ),
+            label: Text(
+              'Forgot to log earlier? Add past reading',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0D9488),
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

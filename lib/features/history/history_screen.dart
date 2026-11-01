@@ -6,6 +6,8 @@ import '../../core/theme/text_size_button.dart';
 import '../../core/theme/theme_toggle_switch.dart';
 import '../../data/db/app_database.dart';
 import '../../data/models/vital_reading.dart';
+import '../manual_entry/manual_entry_header_button.dart';
+import '../manual_entry/manual_entry_sheet.dart';
 import '../record/record_controller.dart';
 
 class HistoryScreen extends ConsumerWidget {
@@ -34,6 +36,7 @@ class HistoryScreen extends ConsumerWidget {
         backgroundColor: theme.appBarTheme.backgroundColor?.withValues(alpha: 0.9),
         surfaceTintColor: Colors.transparent,
         actions: [
+          const ManualEntryHeaderButton(),
           IconButton(
             icon: Icon(
               Icons.refresh_rounded,
@@ -103,6 +106,24 @@ class HistoryScreen extends ConsumerWidget {
                             : const Color(0xFF64748B),
                         height: 1.45,
                         fontSize: 13.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        ManualEntrySheet.show(context);
+                      },
+                      icon: const Icon(Icons.edit_calendar_rounded, size: 18),
+                      label: const Text('Add Past Reading Manually'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D9488),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                     ),
                   ],
