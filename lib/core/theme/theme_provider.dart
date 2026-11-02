@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/preferences_service.dart';
 
 final themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
 
 class ThemeModeNotifier extends Notifier<ThemeMode> {
   @override
-  ThemeMode build() => ThemeMode.light;
+  ThemeMode build() {
+    final prefs = ref.watch(preferencesServiceProvider);
+    return prefs.getThemeMode();
+  }
 
   void toggleTheme() {
-    state = state == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    final newMode = state == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    state = newMode;
+    ref.read(preferencesServiceProvider).saveThemeMode(newMode);
   }
 
   void setTheme(ThemeMode mode) {
     state = mode;
+    ref.read(preferencesServiceProvider).saveThemeMode(mode);
   }
 }
 

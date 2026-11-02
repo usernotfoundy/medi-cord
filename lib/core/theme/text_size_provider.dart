@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/preferences_service.dart';
 
 enum AppTextScale {
   standard(1.0, 'Standard', '1.0x', 'Default reading size'),
@@ -19,16 +20,22 @@ final textScaleProvider =
 
 class TextScaleNotifier extends Notifier<AppTextScale> {
   @override
-  AppTextScale build() => AppTextScale.standard;
+  AppTextScale build() {
+    final prefs = ref.watch(preferencesServiceProvider);
+    return prefs.getTextScale();
+  }
 
   void setScale(AppTextScale scale) {
     state = scale;
+    ref.read(preferencesServiceProvider).saveTextScale(scale);
   }
 
   void cycleNext() {
     final values = AppTextScale.values;
     final nextIndex = (state.index + 1) % values.length;
-    state = values[nextIndex];
+    final nextScale = values[nextIndex];
+    state = nextScale;
+    ref.read(preferencesServiceProvider).saveTextScale(nextScale);
   }
 }
 
