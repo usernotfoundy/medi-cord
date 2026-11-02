@@ -62,6 +62,19 @@ ThemeData buildLightTheme() {
         );
       }),
     ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: const Color(0xFF0F172A),
+      contentTextStyle: const TextStyle(
+        color: Color(0xFFF8FAFC),
+        fontWeight: FontWeight.w600,
+        fontSize: 13.5,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFF334155), width: 1.0),
+      ),
+    ),
   );
 }
 
@@ -103,6 +116,19 @@ ThemeData buildDarkTheme() {
           color: Color(0xFF94A3B8),
         );
       }),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: const Color(0xFFF8FAFC),
+      contentTextStyle: const TextStyle(
+        color: Color(0xFF0F172A),
+        fontWeight: FontWeight.w700,
+        fontSize: 13.5,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.2),
+      ),
     ),
   );
 }

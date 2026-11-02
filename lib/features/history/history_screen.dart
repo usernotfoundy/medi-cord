@@ -1,14 +1,18 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/services/preferences_service.dart';
 import '../../core/theme/text_size_button.dart';
 import '../../core/theme/theme_toggle_switch.dart';
 import '../../data/db/app_database.dart';
 import '../../data/models/vital_reading.dart';
+import '../../data/repositories/vital_repository.dart';
 import '../manual_entry/manual_entry_header_button.dart';
 import '../manual_entry/manual_entry_sheet.dart';
 import '../record/record_controller.dart';
+import 'calendar/history_calendar_view.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -17,6 +21,7 @@ class HistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final readingsAsync = ref.watch(readingsListProvider);
     final repo = ref.watch(vitalRepositoryProvider);
+    final viewMode = ref.watch(historyViewModeProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final reduceMotion = MediaQuery.of(context).disableAnimations;
@@ -55,132 +60,48 @@ class HistoryScreen extends ConsumerWidget {
       ),
       body: readingsAsync.when(
         data: (readings) {
-          if (readings.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF0D9488).withValues(alpha: 0.2)
-                            : const Color(0xFFCCFBF1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark
-                              ? const Color(0xFF14B8A6).withValues(alpha: 0.4)
-                              : const Color(0xFF99F6E4),
-                          width: 1.5,
-                        ),
+          return Column(
+            children: [
+              _buildViewSwitcher(context, viewMode, isDark, ref),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: reduceMotion
+                      ? Duration.zero
+                      : const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    if (reduceMotion) {
+                      return child;
+                    }
+                    final scaleAnim =
+                        Tween<double>(begin: 0.98, end: 1.0).animate(animation);
+                    return FadeTransition(
+                      opacity: animation,
+                      child: ScaleTransition(
+                        scale: scaleAnim,
+                        child: child,
                       ),
-                      child: Icon(
-                        Icons.mic_none_rounded,
-                        size: 38,
-                        color: isDark
-                            ? const Color(0xFF2DD4BF)
-                            : const Color(0xFF0F766E),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'No Vital Signs Recorded Yet',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                        color: isDark
-                            ? const Color(0xFFF1F5F9)
-                            : const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Switch to the Record tab and hold the mic to record your first vital sign (e.g. "Glucose 120").',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
-                        height: 1.45,
-                        fontSize: 13.5,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        ManualEntrySheet.show(context);
-                      },
-                      icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-                      label: const Text('Add Past Reading Manually'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0D9488),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
+                  child: KeyedSubtree(
+                    key: ValueKey(viewMode),
+                    child: viewMode == HistoryViewMode.calendar
+                        ? HistoryCalendarView(readings: readings)
+                        : (readings.isEmpty
+                            ? _buildEmptyState(context, theme, isDark)
+                            : _buildListView(
+                                context,
+                                readings,
+                                ref,
+                                repo,
+                                reduceMotion,
+                                isDark,
+                              )),
+                  ),
                 ),
               ),
-            );
-          }
-
-          return RefreshIndicator(
-            color: const Color(0xFF0D9488),
-            onRefresh: () async {
-              AppDatabase.ensureInitialized();
-              ref.invalidate(readingsListProvider);
-            },
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              itemCount: readings.length,
-              itemBuilder: (context, index) {
-                final item = readings[index];
-                final isFirstInGroup = index == 0 ||
-                    !_isSameDay(readings[index - 1].recordedAt, item.recordedAt);
-
-                final card = _buildReadingCard(
-                  context,
-                  item,
-                  ref,
-                  repo,
-                  index,
-                  reduceMotion,
-                  isDark,
-                );
-
-                if (isFirstInGroup) {
-                  final dayCount = _getDayCount(readings, item.recordedAt);
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildDateHeader(
-                        context,
-                        item.recordedAt,
-                        index == 0,
-                        isDark,
-                        dayCount,
-                      ),
-                      card,
-                      const SizedBox(height: 12),
-                    ],
-                  );
-                }
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: card,
-                );
-              },
-            ),
+            ],
           );
         },
         loading: () => const Center(
@@ -270,6 +191,195 @@ class HistoryScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildViewSwitcher(
+    BuildContext context,
+    HistoryViewMode currentMode,
+    bool isDark,
+    WidgetRef ref,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _HistorySwitcherTab(
+              title: 'List View',
+              icon: Icons.format_list_bulleted_rounded,
+              isSelected: currentMode == HistoryViewMode.list,
+              isDark: isDark,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                ref
+                    .read(historyViewModeProvider.notifier)
+                    .setMode(HistoryViewMode.list);
+              },
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: _HistorySwitcherTab(
+              title: 'Calendar View',
+              icon: Icons.calendar_month_rounded,
+              isSelected: currentMode == HistoryViewMode.calendar,
+              isDark: isDark,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                ref
+                    .read(historyViewModeProvider.notifier)
+                    .setMode(HistoryViewMode.calendar);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, ThemeData theme, bool isDark) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0D9488).withValues(alpha: 0.2)
+                    : const Color(0xFFCCFBF1),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF14B8A6).withValues(alpha: 0.4)
+                      : const Color(0xFF99F6E4),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.mic_none_rounded,
+                size: 38,
+                color: isDark
+                    ? const Color(0xFF2DD4BF)
+                    : const Color(0xFF0F766E),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'No Vital Signs Recorded Yet',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+                color: isDark
+                    ? const Color(0xFFF1F5F9)
+                    : const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Switch to the Record tab and hold the mic to record your first vital sign (e.g. "Glucose 120").',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
+                height: 1.45,
+                fontSize: 13.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ManualEntrySheet.show(context);
+              },
+              icon: const Icon(Icons.edit_calendar_rounded, size: 18),
+              label: const Text('Add Past Reading Manually'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildListView(
+    BuildContext context,
+    List<VitalReading> readings,
+    WidgetRef ref,
+    VitalRepository repo,
+    bool reduceMotion,
+    bool isDark,
+  ) {
+    return RefreshIndicator(
+      color: const Color(0xFF0D9488),
+      onRefresh: () async {
+        AppDatabase.ensureInitialized();
+        ref.invalidate(readingsListProvider);
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        itemCount: readings.length,
+        itemBuilder: (context, index) {
+          final item = readings[index];
+          final isFirstInGroup = index == 0 ||
+              !_isSameDay(readings[index - 1].recordedAt, item.recordedAt);
+
+          final card = _buildReadingCard(
+            context,
+            item,
+            ref,
+            repo,
+            index,
+            reduceMotion,
+            isDark,
+          );
+
+          if (isFirstInGroup) {
+            final dayCount = _getDayCount(readings, item.recordedAt);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildDateHeader(
+                  context,
+                  item.recordedAt,
+                  index == 0,
+                  isDark,
+                  dayCount,
+                ),
+                card,
+                const SizedBox(height: 12),
+              ],
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: card,
+          );
+        },
       ),
     );
   }
@@ -634,10 +744,17 @@ class HistoryScreen extends ConsumerWidget {
   ) {
     HapticFeedback.selectionClick();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
 
-    return showDialog<bool>(
+    return showGeneralDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      barrierDismissible: true,
+      barrierLabel: 'Cancel',
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      transitionDuration: reduceMotion
+          ? Duration.zero
+          : const Duration(milliseconds: 220),
+      pageBuilder: (ctx, anim1, anim2) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         title: Row(
@@ -682,7 +799,8 @@ class HistoryScreen extends ConsumerWidget {
             Text(
               'Are you sure you want to delete this recorded vital sign?',
               style: TextStyle(
-                color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                color:
+                    isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
                 fontSize: 14,
                 height: 1.4,
               ),
@@ -692,10 +810,13 @@ class HistoryScreen extends ConsumerWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                color:
+                    isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? const Color(0xFF334155)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Row(
@@ -706,7 +827,9 @@ class HistoryScreen extends ConsumerWidget {
                     item.type.displayName,
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                      color: isDark
+                          ? const Color(0xFFF1F5F9)
+                          : const Color(0xFF0F172A),
                     ),
                   ),
                   const Spacer(),
@@ -726,14 +849,18 @@ class HistoryScreen extends ConsumerWidget {
                 Icon(
                   Icons.warning_amber_rounded,
                   size: 16,
-                  color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+                  color: isDark
+                      ? const Color(0xFFF87171)
+                      : const Color(0xFFDC2626),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'This action cannot be undone.',
                     style: TextStyle(
-                      color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
+                      color: isDark
+                          ? const Color(0xFFF87171)
+                          : const Color(0xFFDC2626),
                       fontSize: 12.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -749,7 +876,8 @@ class HistoryScreen extends ConsumerWidget {
             child: Text(
               'Cancel',
               style: TextStyle(
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                color:
+                    isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -770,6 +898,142 @@ class HistoryScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        if (reduceMotion) {
+          return child;
+        }
+        final curved = CurvedAnimation(
+          parent: anim,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final scaleAnim = Tween<double>(begin: 0.94, end: 1.0).animate(curved);
+        final slideAnim = Tween<Offset>(
+          begin: const Offset(0, 0.03),
+          end: Offset.zero,
+        ).animate(curved);
+
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: 8.0 * anim.value,
+                  sigmaY: 8.0 * anim.value,
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+            FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: slideAnim,
+                child: ScaleTransition(
+                  scale: scaleAnim,
+                  child: child,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Tactile segmented switcher tab with physical depression scale on press.
+class _HistorySwitcherTab extends StatefulWidget {
+  final String title;
+  final IconData icon;
+  final bool isSelected;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _HistorySwitcherTab({
+    required this.title,
+    required this.icon,
+    required this.isSelected,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_HistorySwitcherTab> createState() => _HistorySwitcherTabState();
+}
+
+class _HistorySwitcherTabState extends State<_HistorySwitcherTab> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+
+    return AnimatedScale(
+      scale: (reduceMotion || !_isPressed) ? 1.0 : 0.96,
+      duration: const Duration(milliseconds: 90),
+      curve: Curves.easeOutCubic,
+      child: Material(
+        color: widget.isSelected
+            ? (widget.isDark
+                ? const Color(0xFF0F766E)
+                : const Color(0xFF0D9488))
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTapDown: (_) => setState(() => _isPressed = true),
+          onTapUp: (_) => setState(() => _isPressed = false),
+          onTapCancel: () => setState(() => _isPressed = false),
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            alignment: Alignment.center,
+            decoration: widget.isSelected
+                ? BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  )
+                : null,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  widget.icon,
+                  size: 16,
+                  color: widget.isSelected
+                      ? Colors.white
+                      : (widget.isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B)),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  widget.title,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight:
+                        widget.isSelected ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: -0.1,
+                    color: widget.isSelected
+                        ? Colors.white
+                        : (widget.isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/text_size_provider.dart';
 
+enum HistoryViewMode { list, calendar }
+
 /// Service responsible for persisting and retrieving user preferences
-/// such as Dark/Light theme mode and accessibility text scaling.
+/// such as Dark/Light theme mode, accessibility text scaling, and history layout.
 class PreferencesService {
   static const String keyThemeMode = 'app_theme_mode';
   static const String keyTextScale = 'app_text_scale';
+  static const String keyHistoryViewMode = 'app_history_view_mode';
 
   SharedPreferences? _prefs;
 
@@ -51,10 +54,51 @@ class PreferencesService {
       // Gracefully handled if SharedPreferences platform channel is unavailable in mock tests
     }
   }
+
+  /// Retrieve the saved HistoryViewMode, defaults to HistoryViewMode.list
+  HistoryViewMode getHistoryViewMode() {
+    final value = _prefs?.getString(keyHistoryViewMode);
+    if (value == 'calendar') return HistoryViewMode.calendar;
+    return HistoryViewMode.list;
+  }
+
+  /// Persist the selected HistoryViewMode
+  Future<void> saveHistoryViewMode(HistoryViewMode mode) async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setString(keyHistoryViewMode, mode.name);
+    } catch (_) {
+      // Gracefully handled if SharedPreferences platform channel is unavailable in mock tests
+    }
+  }
 }
 
 /// Riverpod provider for PreferencesService
 final preferencesServiceProvider = Provider<PreferencesService>((ref) {
   return PreferencesService();
 });
+
+/// Riverpod provider for HistoryViewMode (List vs Calendar)
+final historyViewModeProvider =
+    NotifierProvider<HistoryViewModeNotifier, HistoryViewMode>(
+        HistoryViewModeNotifier.new);
+
+class HistoryViewModeNotifier extends Notifier<HistoryViewMode> {
+  @override
+  HistoryViewMode build() {
+    return ref.watch(preferencesServiceProvider).getHistoryViewMode();
+  }
+
+  void setMode(HistoryViewMode mode) {
+    state = mode;
+    ref.read(preferencesServiceProvider).saveHistoryViewMode(mode);
+  }
+
+  void toggleMode() {
+    final next = state == HistoryViewMode.list
+        ? HistoryViewMode.calendar
+        : HistoryViewMode.list;
+    setMode(next);
+  }
+}
 

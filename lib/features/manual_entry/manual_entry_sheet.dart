@@ -8,14 +8,16 @@ import '../../data/models/vital_reading.dart';
 import '../record/record_controller.dart';
 
 class ManualEntrySheet extends ConsumerStatefulWidget {
-  const ManualEntrySheet({super.key});
+  final DateTime? initialDate;
 
-  static Future<bool?> show(BuildContext context) {
+  const ManualEntrySheet({super.key, this.initialDate});
+
+  static Future<bool?> show(BuildContext context, {DateTime? initialDate}) {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => const ManualEntrySheet(),
+      builder: (ctx) => ManualEntrySheet(initialDate: initialDate),
     );
   }
 
@@ -25,7 +27,7 @@ class ManualEntrySheet extends ConsumerStatefulWidget {
 
 class _ManualEntrySheetState extends ConsumerState<ManualEntrySheet> {
   VitalType _selectedVital = VitalType.bloodPressure;
-  DateTime _selectedDate = DateTime.now();
+  late DateTime _selectedDate;
   TimeOfDay _selectedTime = TimeOfDay.now();
 
   final _primaryController = TextEditingController();
@@ -39,6 +41,7 @@ class _ManualEntrySheetState extends ConsumerState<ManualEntrySheet> {
   @override
   void initState() {
     super.initState();
+    _selectedDate = widget.initialDate ?? DateTime.now();
     _primaryController.addListener(_validateInputs);
     _secondaryController.addListener(_validateInputs);
     _tertiaryController.addListener(_validateInputs);
