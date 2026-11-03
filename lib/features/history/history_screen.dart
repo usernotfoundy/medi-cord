@@ -13,6 +13,8 @@ import '../manual_entry/manual_entry_header_button.dart';
 import '../manual_entry/manual_entry_sheet.dart';
 import '../record/record_controller.dart';
 import 'calendar/history_calendar_view.dart';
+import 'history_filter_controller.dart';
+import 'widgets/history_filter_bar.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -332,54 +334,155 @@ class HistoryScreen extends ConsumerWidget {
     bool reduceMotion,
     bool isDark,
   ) {
-    return RefreshIndicator(
-      color: const Color(0xFF0D9488),
-      onRefresh: () async {
-        AppDatabase.ensureInitialized();
-        ref.invalidate(readingsListProvider);
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        itemCount: readings.length,
-        itemBuilder: (context, index) {
-          final item = readings[index];
-          final isFirstInGroup = index == 0 ||
-              !_isSameDay(readings[index - 1].recordedAt, item.recordedAt);
+    final filter = ref.watch(historyFilterProvider);
+    final filteredReadings = filterHistoryReadings(readings, filter);
 
-          final card = _buildReadingCard(
-            context,
-            item,
-            ref,
-            repo,
-            index,
-            reduceMotion,
-            isDark,
-          );
+    return Column(
+      children: [
+        HistoryFilterBar(
+          totalCount: readings.length,
+          filteredCount: filteredReadings.length,
+        ),
+        const SizedBox(height: 4),
+        Expanded(
+          child: filteredReadings.isEmpty
+              ? _buildFilteredEmptyState(context, isDark, ref)
+              : RefreshIndicator(
+                  color: const Color(0xFF0D9488),
+                  onRefresh: () async {
+                    AppDatabase.ensureInitialized();
+                    ref.invalidate(readingsListProvider);
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 8),
+                    itemCount: filteredReadings.length,
+                    itemBuilder: (context, index) {
+                      final item = filteredReadings[index];
+                      final isFirstInGroup = index == 0 ||
+                          !_isSameDay(
+                              filteredReadings[index - 1].recordedAt,
+                              item.recordedAt);
 
-          if (isFirstInGroup) {
-            final dayCount = _getDayCount(readings, item.recordedAt);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildDateHeader(
-                  context,
-                  item.recordedAt,
-                  index == 0,
-                  isDark,
-                  dayCount,
+                      final card = _buildReadingCard(
+                        context,
+                        item,
+                        ref,
+                        repo,
+                        index,
+                        reduceMotion,
+                        isDark,
+                      );
+
+                      if (isFirstInGroup) {
+                        final dayCount =
+                            _getDayCount(filteredReadings, item.recordedAt);
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildDateHeader(
+                              context,
+                              item.recordedAt,
+                              index == 0,
+                              isDark,
+                              dayCount,
+                            ),
+                            card,
+                            const SizedBox(height: 12),
+                          ],
+                        );
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: card,
+                      );
+                    },
+                  ),
                 ),
-                card,
-                const SizedBox(height: 12),
-              ],
-            );
-          }
+        ),
+      ],
+    );
+  }
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12.0),
-            child: card,
-          );
-        },
+  Widget _buildFilteredEmptyState(
+    BuildContext context,
+    bool isDark,
+    WidgetRef ref,
+  ) {
+    final filter = ref.watch(historyFilterProvider);
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF334155).withValues(alpha: 0.5)
+                    : const Color(0xFFF1F5F9),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF475569)
+                      : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Icon(
+                Icons.filter_list_off_rounded,
+                size: 30,
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Matching Records',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              filter.selectedVital != null
+                  ? 'No ${filter.selectedVital!.displayName} readings found for the selected filter.'
+                  : 'No vital signs found matching the selected filter criteria.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                ref.read(historyFilterProvider.notifier).reset();
+              },
+              icon: const Icon(Icons.clear_all_rounded, size: 16),
+              label: const Text('Clear Filters'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0D9488),
+                side: const BorderSide(color: Color(0xFF0D9488)),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
