@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:medi_cord/core/services/preferences_service.dart';
 import 'package:medi_cord/core/vitals/vital_type.dart';
 import 'package:medi_cord/data/models/vital_reading.dart';
 import 'package:medi_cord/features/history/history_filter_controller.dart';
@@ -190,9 +191,47 @@ void main() {
         ),
       );
 
-      // Verify log count and Filter button
+      // Verify log count and buttons
       expect(find.text('10 recorded logs'), findsOneWidget);
+      expect(find.text('Hide Voice'), findsOneWidget);
       expect(find.text('Filter'), findsOneWidget);
+    });
+
+    testWidgets('tapping Voice toggle button toggles voice transcript visibility', (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: HistoryFilterBar(
+                totalCount: 5,
+                filteredCount: 5,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Initially on ("Hide Voice")
+      expect(find.text('Hide Voice'), findsOneWidget);
+      expect(container.read(showVoiceTranscriptProvider), isTrue);
+
+      // Tap to toggle off
+      await tester.tap(find.text('Hide Voice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unhide Voice'), findsOneWidget);
+      expect(container.read(showVoiceTranscriptProvider), isFalse);
+
+      // Tap again to toggle back on
+      await tester.tap(find.text('Unhide Voice'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Hide Voice'), findsOneWidget);
+      expect(container.read(showVoiceTranscriptProvider), isTrue);
     });
 
     testWidgets('tapping Filter button opens HistoryFilterSheet with options', (tester) async {

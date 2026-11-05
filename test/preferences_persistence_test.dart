@@ -48,6 +48,18 @@ void main() {
       final freshService = PreferencesService(prefs);
       expect(freshService.getTextScale(), AppTextScale.extraLarge);
     });
+
+    test('ShowVoiceTranscript persistence stores and restores preference', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final service = PreferencesService(prefs);
+
+      expect(service.getShowVoiceTranscript(), isTrue);
+      await service.saveShowVoiceTranscript(false);
+      expect(service.getShowVoiceTranscript(), isFalse);
+
+      final freshService = PreferencesService(prefs);
+      expect(freshService.getShowVoiceTranscript(), isFalse);
+    });
   });
 
   group('Riverpod Notifiers Persistence Integration', () {
@@ -97,6 +109,28 @@ void main() {
         ],
       );
       expect(container2.read(textScaleProvider), AppTextScale.huge);
+    });
+
+    test('ShowVoiceTranscriptNotifier toggles and persists preference', () async {
+      final prefs = await SharedPreferences.getInstance();
+      final service = PreferencesService(prefs);
+
+      final container1 = ProviderContainer(
+        overrides: [
+          preferencesServiceProvider.overrideWithValue(service),
+        ],
+      );
+      expect(container1.read(showVoiceTranscriptProvider), isTrue);
+
+      container1.read(showVoiceTranscriptProvider.notifier).toggle();
+      expect(container1.read(showVoiceTranscriptProvider), isFalse);
+
+      final container2 = ProviderContainer(
+        overrides: [
+          preferencesServiceProvider.overrideWithValue(service),
+        ],
+      );
+      expect(container2.read(showVoiceTranscriptProvider), isFalse);
     });
   });
 

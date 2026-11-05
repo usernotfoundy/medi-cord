@@ -625,6 +625,7 @@ class HistoryScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final vital = item.type;
     final timeStr = DateFormat('MMM d, yyyy • h:mm a').format(item.recordedAt);
+    final showVoiceTranscript = ref.watch(showVoiceTranscriptProvider);
 
     final card = Dismissible(
       key: Key('vital_${item.id}'),
@@ -663,159 +664,209 @@ class HistoryScreen extends ConsumerWidget {
             ),
           ],
         ),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: vital.color.withValues(alpha: isDark ? 0.18 : 0.12),
-                    borderRadius: BorderRadius.circular(14),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: showVoiceTranscript ? 16 : 14,
+        ),
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: vital.color.withValues(alpha: isDark ? 0.18 : 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(vital.icon, color: vital.color, size: 26),
                   ),
-                  child: Icon(vital.icon, color: vital.color, size: 26),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        vital.displayName,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.1,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                vital.displayName,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? const Color(0xFF94A3B8)
+                                      : const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ),
+                            if (!showVoiceTranscript) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '• ${DateFormat('h:mm a').format(item.recordedAt)}',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark
+                                      ? const Color(0xFF64748B)
+                                      : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        item.formattedValue,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: vital.color,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: isDark
-                      ? const Color(0xFFEF4444).withValues(alpha: 0.16)
-                      : const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    onTap: () async {
-                      final confirmed =
-                          await _showDeleteConfirmation(context, item);
-                      if (confirmed == true && item.id != null) {
-                        HapticFeedback.mediumImpact();
-                        await repo.deleteReading(item.id!);
-                        ref.invalidate(readingsListProvider);
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isDark
-                              ? const Color(0xFFEF4444).withValues(alpha: 0.40)
-                              : const Color(0xFFFCA5A5),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.delete_outline_rounded,
-                            size: 16,
-                            color: isDark
-                                ? const Color(0xFFF87171)
-                                : const Color(0xFFDC2626),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.formattedValue,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: vital.color,
+                            letterSpacing: -0.5,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Delete',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    color: isDark
+                        ? const Color(0xFFEF4444).withValues(alpha: 0.16)
+                        : const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(10),
+                    child: InkWell(
+                      onTap: () async {
+                        final confirmed =
+                            await _showDeleteConfirmation(context, item);
+                        if (confirmed == true && item.id != null) {
+                          HapticFeedback.mediumImpact();
+                          await repo.deleteReading(item.id!);
+                          ref.invalidate(readingsListProvider);
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDark
+                                ? const Color(0xFFEF4444).withValues(alpha: 0.40)
+                                : const Color(0xFFFCA5A5),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.delete_outline_rounded,
+                              size: 16,
                               color: isDark
                                   ? const Color(0xFFF87171)
                                   : const Color(0xFFDC2626),
-                              letterSpacing: -0.1,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(8),
-                border: isDark ? Border.all(color: const Color(0xFF334155)) : null,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.mic_rounded,
-                        size: 13,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '"${item.rawTranscript}"',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Delete',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                  ? const Color(0xFFF87171)
+                                  : const Color(0xFFDC2626),
+                                letterSpacing: -0.1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                  Text(
-                    timeStr,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                     ),
                   ),
                 ],
               ),
-            ),
-            if (item.note != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                item.note!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFFDC2626),
-                  fontWeight: FontWeight.w500,
+              if (showVoiceTranscript &&
+                  item.rawTranscript.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: isDark
+                        ? Border.all(color: const Color(0xFF334155))
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.mic_rounded,
+                              size: 13,
+                              color: isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 5),
+                            Flexible(
+                              child: Text(
+                                '"${item.rawTranscript}"',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontStyle: FontStyle.italic,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark
+                                      ? const Color(0xFFCBD5E1)
+                                      : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        timeStr,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
+              if (item.note != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  item.note!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFFDC2626),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

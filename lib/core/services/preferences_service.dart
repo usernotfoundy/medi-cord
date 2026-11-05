@@ -11,6 +11,7 @@ class PreferencesService {
   static const String keyThemeMode = 'app_theme_mode';
   static const String keyTextScale = 'app_text_scale';
   static const String keyHistoryViewMode = 'app_history_view_mode';
+  static const String keyShowVoiceTranscript = 'app_history_show_voice_transcript';
 
   SharedPreferences? _prefs;
 
@@ -71,6 +72,22 @@ class PreferencesService {
       // Gracefully handled if SharedPreferences platform channel is unavailable in mock tests
     }
   }
+
+  /// Retrieve the saved preference for displaying voice transcripts in history cards.
+  /// Defaults to true (visible).
+  bool getShowVoiceTranscript() {
+    return _prefs?.getBool(keyShowVoiceTranscript) ?? true;
+  }
+
+  /// Persist the show voice transcript preference
+  Future<void> saveShowVoiceTranscript(bool show) async {
+    try {
+      _prefs ??= await SharedPreferences.getInstance();
+      await _prefs?.setBool(keyShowVoiceTranscript, show);
+    } catch (_) {
+      // Gracefully handled if SharedPreferences platform channel is unavailable in mock tests
+    }
+  }
 }
 
 /// Riverpod provider for PreferencesService
@@ -99,6 +116,29 @@ class HistoryViewModeNotifier extends Notifier<HistoryViewMode> {
         ? HistoryViewMode.calendar
         : HistoryViewMode.list;
     setMode(next);
+  }
+}
+
+/// Riverpod provider for whether voice transcripts should be displayed in history cards
+final showVoiceTranscriptProvider =
+    NotifierProvider<ShowVoiceTranscriptNotifier, bool>(
+        ShowVoiceTranscriptNotifier.new);
+
+class ShowVoiceTranscriptNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    return ref.watch(preferencesServiceProvider).getShowVoiceTranscript();
+  }
+
+  void toggle() {
+    final next = !state;
+    state = next;
+    ref.read(preferencesServiceProvider).saveShowVoiceTranscript(next);
+  }
+
+  void setShow(bool show) {
+    state = show;
+    ref.read(preferencesServiceProvider).saveShowVoiceTranscript(show);
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/services/preferences_service.dart';
 import '../history_filter_controller.dart';
 import 'history_filter_sheet.dart';
 
@@ -23,6 +24,7 @@ class HistoryFilterBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(historyFilterProvider);
+    final showVoiceTranscript = ref.watch(showVoiceTranscriptProvider);
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final hasActive = filter.hasActiveFilter;
@@ -34,56 +36,80 @@ class HistoryFilterBar extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Primary Sub-Bar: Log Count + Filter Action Button
+          // Primary Sub-Bar: Log Count + Action Buttons
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Log Count Display
-              Row(
-                children: [
-                  Icon(
-                    hasActive
-                        ? Icons.filter_alt_outlined
-                        : Icons.format_list_bulleted_rounded,
-                    size: 15,
-                    color: hasActive
-                        ? const Color(0xFF0D9488)
-                        : (isDark
-                            ? const Color(0xFF64748B)
-                            : const Color(0xFF94A3B8)),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    hasActive
-                        ? 'Showing $filteredCount of $totalCount logs'
-                        : '$totalCount recorded ${totalCount == 1 ? "log" : "logs"}',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight:
-                          hasActive ? FontWeight.w700 : FontWeight.w600,
-                      letterSpacing: -0.1,
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      hasActive
+                          ? Icons.filter_alt_outlined
+                          : Icons.format_list_bulleted_rounded,
+                      size: 15,
                       color: hasActive
-                          ? (isDark
-                              ? const Color(0xFF2DD4BF)
-                              : const Color(0xFF0F766E))
+                          ? const Color(0xFF0D9488)
                           : (isDark
-                              ? const Color(0xFF94A3B8)
-                              : const Color(0xFF64748B)),
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8)),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        hasActive
+                            ? 'Showing $filteredCount of $totalCount logs'
+                            : '$totalCount recorded ${totalCount == 1 ? "log" : "logs"}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight:
+                              hasActive ? FontWeight.w700 : FontWeight.w600,
+                          letterSpacing: -0.1,
+                          color: hasActive
+                              ? (isDark
+                                  ? const Color(0xFF2DD4BF)
+                                  : const Color(0xFF0F766E))
+                              : (isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              // Filter Trigger Button
-              _FilterButton(
-                hasActive: hasActive,
-                activeCount: activeCount,
-                isDark: isDark,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  HistoryFilterSheet.show(context);
-                },
+              const SizedBox(width: 8),
+
+              // Action Buttons: Voice Transcript Toggle + Filter Trigger
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _TranscriptToggleButton(
+                    isVisible: showVoiceTranscript,
+                    isDark: isDark,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      ref
+                          .read(showVoiceTranscriptProvider.notifier)
+                          .toggle();
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  _FilterButton(
+                    hasActive: hasActive,
+                    activeCount: activeCount,
+                    isDark: isDark,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      HistoryFilterSheet.show(context);
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -327,6 +353,100 @@ class _ActiveFilterTag extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tactile button to toggle visibility of voice transcripts on history cards
+class _TranscriptToggleButton extends StatefulWidget {
+  final bool isVisible;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  const _TranscriptToggleButton({
+    required this.isVisible,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  @override
+  State<_TranscriptToggleButton> createState() =>
+      _TranscriptToggleButtonState();
+}
+
+class _TranscriptToggleButtonState extends State<_TranscriptToggleButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = widget.isVisible
+        ? (widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+        : (widget.isDark
+            ? const Color(0xFF0D9488).withValues(alpha: 0.18)
+            : const Color(0xFFCCFBF1).withValues(alpha: 0.8));
+
+    final borderColor = widget.isVisible
+        ? (widget.isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
+        : (widget.isDark
+            ? const Color(0xFF2DD4BF).withValues(alpha: 0.6)
+            : const Color(0xFF0D9488).withValues(alpha: 0.5));
+
+    final iconColor = widget.isVisible
+        ? (widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+        : (widget.isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E));
+
+    final textColor = widget.isVisible
+        ? (widget.isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569))
+        : (widget.isDark ? const Color(0xFF2DD4BF) : const Color(0xFF0F766E));
+
+    return Tooltip(
+      message: widget.isVisible
+          ? 'Hide voice records'
+          : 'Unhide voice records',
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) => setState(() => _isPressed = false),
+        onTapCancel: () => setState(() => _isPressed = false),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+          scale: _isPressed ? 0.94 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOutCubic,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: borderColor,
+                width: widget.isVisible ? 1.0 : 1.2,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  widget.isVisible
+                      ? Icons.mic_off_rounded
+                      : Icons.mic_rounded,
+                  size: 15,
+                  color: iconColor,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  widget.isVisible ? 'Hide Voice' : 'Unhide Voice',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.1,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
